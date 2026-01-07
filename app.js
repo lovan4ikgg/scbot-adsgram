@@ -8,8 +8,8 @@ tg.expand();
 // Получение данных пользователя
 const userId = tg.initDataUnsafe?.user?.id;
 
-// ВАЖНО: Замени на свой BLOCK_ID от AdGram после регистрации!
-const ADSGRAM_BLOCK_ID = "YOUR_BLOCK_ID_FROM_ADSGRAM";
+// BLOCK_ID от AdGram
+const ADSGRAM_BLOCK_ID = "20769";
 
 // Элементы DOM
 const loadAdButton = document.getElementById('load-ad');
