@@ -16,23 +16,55 @@ const loadAdButton = document.getElementById('load-ad');
 const adContainer = document.getElementById('ad-container');
 const statusElement = document.getElementById('status');
 const loaderElement = document.getElementById('loader');
+const debugElement = document.getElementById('debug-info');
+
+// Функция отладки
+function debugLog(msg) {
+    console.log(msg);
+    if (debugElement) {
+        debugElement.style.display = 'block';
+        const timestamp = new Date().toLocaleTimeString();
+        debugElement.innerHTML += `<div>[${timestamp}] ${JSON.stringify(msg)}</div>`;
+        debugElement.scrollTop = debugElement.scrollHeight;
+    }
+}
 
 // Проверка инициализации
 if (!userId) {
     statusElement.textContent = '⚠️ Ошибка: откройте Mini App из Telegram бота';
     statusElement.className = 'error';
     loadAdButton.disabled = true;
+    debugLog('ERROR: No user ID');
 } else {
-    console.log('User ID:', userId);
+    debugLog(`User ID: ${userId}`);
 }
 
 // Инициализация AdGram SDK
 let AdController;
-try {
-    AdController = window.Adsgram?.init({ blockId: ADSGRAM_BLOCK_ID });
-    console.log('AdGram SDK initialized');
-} catch (err) {
-    console.error('AdGram SDK initialization failed:', err);
+
+// Проверка загрузки SDK
+debugLog({
+    step: 'SDK Check',
+    windowAdsgram: typeof window.Adsgram,
+    adsgramExists: !!window.Adsgram,
+    blockId: ADSGRAM_BLOCK_ID
+});
+
+if (!window.Adsgram) {
+    debugLog('ERROR: AdGram SDK not loaded!');
+    statusElement.textContent = '⚠️ AdGram SDK не загружен. Перезагрузи страницу.';
+    statusElement.className = 'error';
+    loadAdButton.disabled = true;
+} else {
+    try {
+        AdController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
+        debugLog({ step: 'SDK Initialized', controller: typeof AdController });
+    } catch (err) {
+        debugLog({ step: 'SDK Init Failed', error: err.message });
+        statusElement.textContent = `⚠️ Ошибка инициализации: ${err.message}`;
+        statusElement.className = 'error';
+        loadAdButton.disabled = true;
+    }
 }
 
 // Обработчик кнопки загрузки рекламы
@@ -49,13 +81,13 @@ loadAdButton.addEventListener('click', async () => {
     statusElement.className = '';
 
     try {
-        console.log('Showing ad with AdGram SDK...');
+        debugLog({ step: 'Showing ad', controllerType: typeof AdController });
 
         // Показать рекламу через AdGram SDK
         await AdController.show()
             .then(() => {
                 // Реклама просмотрена успешно
-                console.log('Ad watched successfully');
+                debugLog({ step: 'Ad watched successfully' });
 
                 loaderElement.classList.remove('active');
                 statusElement.textContent = '✅ Готово! Получил 3 скачивания. Возвращайся в бота...';
@@ -83,11 +115,21 @@ loadAdButton.addEventListener('click', async () => {
             });
 
     } catch (error) {
-        console.error('Ad loading error:', error);
+        debugLog({
+            step: 'Ad loading error',
+            errorType: typeof error,
+            message: error?.message,
+            name: error?.name,
+            error: String(error)
+        });
 
-        let errorMsg = '❌ Ошибка загрузки рекламы.';
+        let errorMsg = '❌ ';
         if (error?.message) {
-            errorMsg += ` ${error.message}`;
+            errorMsg += error.message;
+        } else if (typeof error === 'string') {
+            errorMsg += error;
+        } else {
+            errorMsg += 'Смотри debug info ниже';
         }
 
         statusElement.textContent = errorMsg;
