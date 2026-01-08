@@ -120,7 +120,10 @@ loadAdButton.addEventListener('click', async () => {
             errorType: typeof error,
             message: error?.message,
             name: error?.name,
-            error: String(error)
+            code: error?.code,
+            description: error?.description,
+            error: String(error),
+            fullError: JSON.stringify(error, null, 2)
         });
 
         let errorMsg = '❌ ';
