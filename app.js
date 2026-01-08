@@ -26,124 +26,77 @@ if (!userId) {
     console.log('User ID:', userId);
 }
 
+// Инициализация AdGram SDK
+let AdController;
+try {
+    AdController = window.Adsgram?.init({ blockId: ADSGRAM_BLOCK_ID });
+    console.log('AdGram SDK initialized');
+} catch (err) {
+    console.error('AdGram SDK initialization failed:', err);
+}
+
 // Обработчик кнопки загрузки рекламы
 loadAdButton.addEventListener('click', async () => {
+    if (!AdController) {
+        statusElement.textContent = '❌ AdGram SDK не загружен';
+        statusElement.className = 'error';
+        return;
+    }
+
     loadAdButton.disabled = true;
     loaderElement.classList.add('active');
     statusElement.textContent = '🔄 Загружаю рекламу...';
     statusElement.className = '';
 
     try {
-        // Запрос рекламы от AdGram
-        const adUrl = `https://api.adsgram.ai/advbot?tgid=${userId}&blockid=${ADSGRAM_BLOCK_ID}`;
+        console.log('Showing ad with AdGram SDK...');
 
-        console.log('Requesting ad from:', adUrl);
+        // Показать рекламу через AdGram SDK
+        await AdController.show()
+            .then(() => {
+                // Реклама просмотрена успешно
+                console.log('Ad watched successfully');
 
-        const response = await fetch(adUrl);
+                loaderElement.classList.remove('active');
+                statusElement.textContent = '✅ Готово! Получил 3 скачивания. Возвращайся в бота...';
+                statusElement.className = 'success';
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+                // Отправить данные боту
+                const payload = JSON.stringify({
+                    action: 'ad_watched',
+                    user_id: userId,
+                    timestamp: Date.now(),
+                    session_id: `adsgram_${Date.now()}`
+                });
 
-        const data = await response.json();
+                console.log('Sending data to bot:', payload);
+                tg.sendData(payload);
 
-        console.log('AdGram response:', data);
+                // Закрыть Mini App через 2 секунды
+                setTimeout(() => {
+                    tg.close();
+                }, 2000);
+            })
+            .catch((error) => {
+                // Ошибка при показе рекламы
+                throw error;
+            });
 
-        if (data.video_url) {
-            // Показать видео
-            showVideo(data.video_url, data.session_id || generateSessionId());
-        } else if (data.error) {
-            throw new Error(data.error);
-        } else {
-            throw new Error('Реклама недоступна');
-        }
     } catch (error) {
         console.error('Ad loading error:', error);
-        statusElement.textContent = '❌ Ошибка загрузки рекламы. Попробуй еще раз.';
+
+        let errorMsg = '❌ Ошибка загрузки рекламы.';
+        if (error?.message) {
+            errorMsg += ` ${error.message}`;
+        }
+
+        statusElement.textContent = errorMsg;
         statusElement.className = 'error';
         loadAdButton.disabled = false;
         loaderElement.classList.remove('active');
     }
 });
 
-function showVideo(videoUrl, sessionId) {
-    loaderElement.classList.remove('active');
-
-    // Очистить контейнер
-    adContainer.innerHTML = '';
-
-    // Создать видео элемент
-    const video = document.createElement('video');
-    video.src = videoUrl;
-    video.controls = false; // Без контролов
-    video.autoplay = true;
-    video.playsInline = true; // Для iOS
-    video.preload = 'auto';
-    video.style.width = '100%';
-    video.style.height = 'auto';
-    video.style.maxHeight = '400px';
-    video.style.objectFit = 'contain';
-
-    // Показать контейнер
-    adContainer.classList.add('active');
-    adContainer.appendChild(video);
-
-    statusElement.textContent = '▶️ Смотри видео до конца...';
-    statusElement.className = '';
-
-    // Обработчик окончания видео
-    video.addEventListener('ended', () => {
-        console.log('Video ended, session:', sessionId);
-
-        // Отправить данные боту через Telegram WebApp API
-        const payload = JSON.stringify({
-            action: 'ad_watched',
-            session_id: sessionId,
-            user_id: userId,
-            timestamp: Date.now()
-        });
-
-        console.log('Sending data to bot:', payload);
-
-        // Отправка данных боту
-        tg.sendData(payload);
-
-        // Показать успешное завершение
-        statusElement.textContent = '✅ Готово! Получил 3 скачивания. Возвращайся в бота...';
-        statusElement.className = 'success';
-
-        // Закрыть Mini App через 2 секунды
-        setTimeout(() => {
-            tg.close();
-        }, 2000);
-    });
-
-    // Обработчик ошибки видео
-    video.addEventListener('error', (e) => {
-        console.error('Video playback error:', e);
-        statusElement.textContent = '❌ Ошибка воспроизведения видео. Попробуй еще раз.';
-        statusElement.className = 'error';
-        loadAdButton.disabled = false;
-        adContainer.classList.remove('active');
-    });
-
-    // Обработчик готовности видео
-    video.addEventListener('loadeddata', () => {
-        console.log('Video loaded successfully');
-        statusElement.textContent = `▶️ Видео загружено (${Math.round(video.duration)}с). Смотри до конца!`;
-    });
-
-    // Попытка запустить видео (для автоплея)
-    video.play().catch(err => {
-        console.warn('Autoplay prevented, showing play button:', err);
-        video.controls = true; // Показать контролы если автоплей заблокирован
-    });
-}
-
-// Генерация уникального session ID если AdGram не предоставил
-function generateSessionId() {
-    return `session_${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
 
 // Обработка кнопки "Назад" в Telegram
 tg.BackButton.onClick(() => {
